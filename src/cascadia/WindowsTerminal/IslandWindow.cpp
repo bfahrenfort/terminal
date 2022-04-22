@@ -544,6 +544,7 @@ long IslandWindow::_calculateTotalSize(const bool isWidth, const long clientSize
         return 0;
     case WM_WINDOWPOSCHANGING:
     {
+        bool noMove, noSize;
         // GH#10274 - if the quake window gets moved to another monitor via aero
         // snap (win+shift+arrows), then re-adjust the size for the new monitor.
         if (IsQuakeWindow())
@@ -553,11 +554,13 @@ long IslandWindow::_calculateTotalSize(const bool isWidth, const long clientSize
 
             // We only need to apply restrictions if the position is changing.
             // The SWP_ flags are confusing to read. This is
-            // "if we're not moving the window, do nothing."
-            if (WI_IsFlagSet(lpwpos->flags, SWP_NOMOVE))
+            // "if we're not moving or resizing the window, do nothing."
+            // GH #12924
+            if ( (noMove = WI_IsFlagSet(lpwpos->flags, SWP_NOMOVE)) && (noSize = WI_IsFlagSet(lpwpos->flags, SWP_NOSIZE)) )
             {
                 break;
             }
+
             // Figure out the suggested dimensions and position.
             RECT rcSuggested;
             rcSuggested.left = lpwpos->x;
@@ -567,7 +570,6 @@ long IslandWindow::_calculateTotalSize(const bool isWidth, const long clientSize
 
             // Find the bounds of the current monitor, and the monitor that
             // we're suggested to be on.
-
             HMONITOR current = MonitorFromWindow(_window.get(), MONITOR_DEFAULTTONEAREST);
             MONITORINFO currentInfo;
             currentInfo.cbSize = sizeof(MONITORINFO);
@@ -587,11 +589,22 @@ long IslandWindow::_calculateTotalSize(const bool isWidth, const long clientSize
                 // Inform User32 that we want to be placed at the position
                 // and dimensions that _getQuakeModeSize returned. When we
                 // snap across monitor boundaries, this will re-evaluate our
-                // size for the new monitor.
-                lpwpos->x = newWindowRect.left;
-                lpwpos->y = newWindowRect.top;
-                lpwpos->cx = newWindowRect.width();
-                lpwpos->cy = newWindowRect.height();
+                // size and position for the new monitor.
+                // GH #12924: check SWP_NOMOVE and SWP_NOSIZE, clear both if either is unset
+                if (!noMove)
+                {
+                    lpwpos->x = newWindowRect.left;
+                    lpwpos->y = newWindowRect.top;
+                }
+                if (!noSize)
+                {
+                    lpwpos->cx = newWindowRect.width();
+                    lpwpos->cy = newWindowRect.height();
+                }
+
+                // at least one of the above executes, so we should clear flags.
+                WI_ClearFlag(lpwpos->flags, SWP_NOMOVE);
+                WI_ClearFlag(lpwpos->flags, SWP_NOSIZE);
 
                 return 0;
             }
