@@ -591,20 +591,19 @@ long IslandWindow::_calculateTotalSize(const bool isWidth, const long clientSize
                 // snap across monitor boundaries, this will re-evaluate our
                 // size and position for the new monitor.
                 // GH #12924: check SWP_NOMOVE and SWP_NOSIZE, clear both if either is unset
-                if (!noMove)
+                if (!noMove) // newWindowRect contains a new position, must set.
                 {
                     lpwpos->x = newWindowRect.left;
                     lpwpos->y = newWindowRect.top;
                 }
-                if (!noSize)
+                if (!noSize) // newWindowRect contains a new size, must set.
                 {
                     lpwpos->cx = newWindowRect.width();
                     lpwpos->cy = newWindowRect.height();
                 }
 
                 // at least one of the above executes, so we should clear flags.
-                WI_ClearFlag(lpwpos->flags, SWP_NOMOVE);
-                WI_ClearFlag(lpwpos->flags, SWP_NOSIZE);
+                WI_ClearAllFlags(lpwpos->flags, SWP_NOMOVE | SWP_NOSIZE);
 
                 return 0;
             }
